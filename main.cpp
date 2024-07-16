@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/mman.h>
 
 // C++ includes
 
@@ -62,15 +65,46 @@ static FT_Face face;
 
 // Bar
 static int width;
-static int height;
+static int height = 30;
 static int stride;
 static int bufsize;
-static bool configured;
+static bool configured = false;
 static void draw_bar();
+
+//
+// General
+//
+
+static int allocate_shm_file(size_t size) {
+	int fd = memfd_create("surface", MFD_CLOEXEC);
+	if (fd == -1) die("Failed to create shared memory");
+	
+    int ret;
+	do {
+		ret = ftruncate(fd, size);
+	} while (ret == -1 && errno == EINTR);
+    errno = 0;
+
+	if (ret == -1) {
+		close(fd);
+		die("Failed to truncate shared memory");
+	}
+
+	return fd;
+}
 
 //
 // Wayland stuff
 //
+
+static void wl_buffer_release(void *data, struct wl_buffer *wl_buffer) {
+	(void) data;
+    wl_buffer_destroy(wl_buffer);
+}
+
+static const struct wl_buffer_listener wl_buffer_listener = {
+	.release = wl_buffer_release,
+};
 
 static void handle_global(void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
     (void) data;
@@ -237,7 +271,60 @@ static void setup_bar() {
 }
 
 static void draw_bar() {
+    if (int fd = allocate_shm_file(bufsize); fd != -1) {
+        if (uint32_t *data = (uint32_t *) mmap(NULL, bufsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0); data != MAP_FAILED) {
+            struct wl_shm_pool *pool = wl_shm_create_pool(shm, fd, bufsize);
+            struct wl_buffer *buffer = wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
+            wl_buffer_add_listener(buffer, &wl_buffer_listener, NULL);
+            wl_shm_pool_destroy(pool);
+            {
+                for (int y = 0; y < height; y++) {
+                    for (int x = 0; x < width; x++) {
+                        data[x + y * width] = rand();
+                    }
+                }
+            }
+            munmap(data, bufsize);
+            wl_surface_set_buffer_scale(surface, 1);
+            wl_surface_attach(surface, buffer, 0, 0);
+            wl_surface_damage_buffer(surface, 0, 0, width, height);
+            wl_surface_commit(surface);
+        }
+        close(fd);
+    };
+}
 
+static int sock_fd;
+
+static void event_loop(void) {
+	int wl_fd = wl_display_get_fd(display);
+
+	while (true) {
+		fd_set rfds;
+		FD_ZERO(&rfds);
+		FD_SET(wl_fd, &rfds);
+		FD_SET(sock_fd, &rfds);
+		FD_SET(STDIN_FILENO, &rfds);
+
+		wl_display_flush(display);
+
+		if (select(std::max(sock_fd, wl_fd) + 1, &rfds, NULL, NULL, NULL) == -1) {
+			if (errno == EINTR)
+				continue;
+			else
+				dief("select: %h");
+		}
+		
+		if (FD_ISSET(wl_fd, &rfds))
+			if (wl_display_dispatch(display) == -1)
+				break;
+		// if (FD_ISSET(sock_fd, &rfds))
+		// 	read_socket();
+		// if (FD_ISSET(STDIN_FILENO, &rfds))
+		// 	read_stdin();
+		
+		draw_bar();
+	}
 }
 
 static void clean_up() {
@@ -250,12 +337,14 @@ static void clean_up() {
 }
 
 int main() {
+    printf("Starting hyprbar v0.0\n");
+
 	init_wayland_connection();
     init_font();
-
     atexit(clean_up);
-
     setup_bar();
+
+    event_loop();
 
     printf("All ok... for now.\n");
     
