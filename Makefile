@@ -49,17 +49,20 @@ PROTOCOLS_SRCS    := $(patsubst %, $(SRC_DIRECTORY)/%.c, $(PROTOCOLS))
 PROTOCOLS_BINS    := $(patsubst %, $(BUILD_DIRECTORY)/%.o, $(PROTOCOLS))
 
 LIBS += wayland-client
-LIBS += fcft
+LIBS += freetype2
 
 hyprbar: CPPFLAGS += $(shell pkg-config --cflags $(LIBS))
 hyprbar: LDFLAGS  += $(shell pkg-config --libs   $(LIBS))
 
-hyprbar: main.cpp $(PROTOCOLS_BINS) | $(PROTOCOLS_HEADERS)
+hyprbar: main.cpp $(PROTOCOLS_BINS) | config.hpp $(PROTOCOLS_HEADERS)
 	g++ -o $@ $(CPPFLAGS) $^ $(LDFLAGS)
+
+start: hyprbar
+	./hyprbar
 
 clean:
 	rm -f $(PROTOCOLS_HEADERS)
 	rm -f $(PROTOCOLS_SRCS)
 	rm -rf build
 
-.PHONY: clean
+.PHONY: start clean
