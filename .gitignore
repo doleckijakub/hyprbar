@@ -32,3 +32,11 @@
 *.app
 
 hyprbar
+
+include/xdg-shell.h
+include/xdg-output-unstable-v1.h
+include/wlr-layer-shell-unstable-v1.h
+
+src/xdg-shell.c
+src/xdg-output-unstable-v1.c
+src/wlr-layer-shell-unstable-v1.c

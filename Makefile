@@ -54,7 +54,7 @@ LIBS += freetype2
 hyprbar: CPPFLAGS += $(shell pkg-config --cflags $(LIBS))
 hyprbar: LDFLAGS  += $(shell pkg-config --libs   $(LIBS))
 
-hyprbar: main.cpp $(PROTOCOLS_BINS) | config.hpp $(PROTOCOLS_HEADERS)
+hyprbar: *.cpp $(PROTOCOLS_BINS) | *.hpp $(PROTOCOLS_HEADERS)
 	g++ -o $@ $(CPPFLAGS) $^ $(LDFLAGS)
 
 start: hyprbar
