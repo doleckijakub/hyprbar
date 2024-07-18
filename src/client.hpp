@@ -19,7 +19,7 @@
 class Client {
 public:
 
-    static void add_bar(std::shared_ptr<Bar> bar);
+    static void add_bar(const Bar::Config bar_config);
     static void start();
 
 private:

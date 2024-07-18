@@ -24,7 +24,8 @@ Client::~Client() {
 	FT_Done_FreeType(library);
 }
 
-void Client::add_bar(std::shared_ptr<Bar> bar) {
+void Client::add_bar(const Bar::Config bar_config) {
+    auto bar = std::make_shared<Bar>(bar_config);
     get_instance().__bars.push_back(bar);
 
     if (!(bar->surface = wl_compositor_create_surface(get_instance().compositor))) {

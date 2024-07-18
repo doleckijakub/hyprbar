@@ -17,8 +17,6 @@ void Bar::Canvas::set_pixel(int x, int y, uint32_t color) {
 }
 
 Bar::Canvas::Canvas(const Bar *bar) : __bar(bar), __width(bar->__width), __height(bar->__height) {
-    tracef("%s(__width: %d, __height: %d)", __func__, __width, __height);
-    
     if ((__shm_fd = Client::allocate_shm_file(__bar->__bufsize)) == -1) throw std::runtime_error("allocate_shm_file failed");
     if ((__data = (uint32_t *) mmap(NULL, __bar->__bufsize, PROT_READ | PROT_WRITE, MAP_SHARED, __shm_fd, 0)) == MAP_FAILED) throw std::runtime_error("mmap failed");
     
@@ -39,8 +37,6 @@ Bar::Canvas::~Canvas() {
 }
 
 Bar::Bar(const Config config) : __config(config) {
-    tracef("%s(config.width/height: %d, config.position: %d)", __func__, config.width, config.position);
-    
     switch (config.position) {
         case Bar::Position::TOP:
         case Bar::Position::BOTTOM:
@@ -51,8 +47,6 @@ Bar::Bar(const Config config) : __config(config) {
             __width = __config.width;
             break;
     }
-
-    tracef("%s:%d: (__width: %d, __height: %d)", __FILE__, __LINE__, __width, __height);
 }
 
 Bar::~Bar() {
