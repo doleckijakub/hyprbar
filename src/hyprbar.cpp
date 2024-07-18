@@ -1,7 +1,7 @@
 #include "common.hpp"
 #include "client.hpp"
 
-#include "config.hpp"
+#include "hyprbar.hpp"
 
 int main() {
     try {

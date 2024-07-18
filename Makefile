@@ -46,15 +46,25 @@ PROTOCOLS += wlr-layer-shell-unstable-v1
 
 PROTOCOLS_HEADERS := $(patsubst %, $(INCLUDE_DIRECTORY)/%.h, $(PROTOCOLS))
 PROTOCOLS_SRCS    := $(patsubst %, $(SRC_DIRECTORY)/%.c, $(PROTOCOLS))
-PROTOCOLS_BINS    := $(patsubst %, $(BUILD_DIRECTORY)/%.o, $(PROTOCOLS))
+PROTOCOLS_OBJS    := $(patsubst %, $(BUILD_DIRECTORY)/%.o, $(PROTOCOLS))
 
 LIBS += wayland-client
 LIBS += freetype2
 
-hyprbar: CPPFLAGS += $(shell pkg-config --cflags $(LIBS))
-hyprbar: LDFLAGS  += $(shell pkg-config --libs   $(LIBS))
+CPPFLAGS += $(shell pkg-config --cflags $(LIBS))
+LDFLAGS  += $(shell pkg-config --libs   $(LIBS))
 
-hyprbar: *.cpp $(PROTOCOLS_BINS) | *.hpp $(PROTOCOLS_HEADERS)
+SOURCES += common
+SOURCES += client
+SOURCES += bar
+SOURCES += hyprbar
+
+OBJS := $(patsubst %, $(BUILD_DIRECTORY)/%.o, $(SOURCES))
+
+$(BUILD_DIRECTORY)/%.o: $(SRC_DIRECTORY)/%.cpp | $(SRC_DIRECTORY)/%.hpp
+	g++ -c -o $@ $(CPPFLAGS) $^
+
+hyprbar: $(OBJS) $(PROTOCOLS_OBJS) | $(PROTOCOLS_HEADERS)
 	g++ -o $@ $(CPPFLAGS) $^ $(LDFLAGS)
 
 start: hyprbar
