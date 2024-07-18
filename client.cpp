@@ -19,51 +19,56 @@ Client::Client() {
 }
 
 Client::~Client() {
-    zwlr_layer_surface_v1_destroy(layer_surface);
-	wl_surface_destroy(surface);
-	zxdg_output_v1_destroy(xdg_output);
-	wl_output_destroy(output);
+    wl_output_destroy(output);
 
-    FT_Done_FreeType(library);
+	FT_Done_FreeType(library);
 }
 
 void Client::add_bar(std::shared_ptr<Bar> bar) {
     get_instance().__bars.push_back(bar);
 
+    if (!(bar->surface = wl_compositor_create_surface(get_instance().compositor))) {
+        die("Failed to create a wayland surface");
+    }
+
+    if (!(bar->layer_surface = create_layer_surface(bar.get()))) {
+        die("Failed to create a wlr layer surface");
+    }
+
     switch (bar->__config.position) {
         case Bar::Position::TOP: {
-            zwlr_layer_surface_v1_set_size(get_instance().layer_surface, 0, bar->__height);
-            zwlr_layer_surface_v1_set_anchor(get_instance().layer_surface, ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT | ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP);
+            zwlr_layer_surface_v1_set_size(bar->layer_surface, 0, bar->__height);
+            zwlr_layer_surface_v1_set_anchor(bar->layer_surface, ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT | ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP);
             break;
         }
         case Bar::Position::BOTTOM: {
-            zwlr_layer_surface_v1_set_size(get_instance().layer_surface, 0, bar->__height);
-            zwlr_layer_surface_v1_set_anchor(get_instance().layer_surface, ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM);
+            zwlr_layer_surface_v1_set_size(bar->layer_surface, 0, bar->__height);
+            zwlr_layer_surface_v1_set_anchor(bar->layer_surface, ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM);
             break;
         }
         case Bar::Position::LEFT: {
-            zwlr_layer_surface_v1_set_size(get_instance().layer_surface, bar->__width, 0);
-            zwlr_layer_surface_v1_set_anchor(get_instance().layer_surface, ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT);
+            zwlr_layer_surface_v1_set_size(bar->layer_surface, bar->__width, 0);
+            zwlr_layer_surface_v1_set_anchor(bar->layer_surface, ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT);
             break;
         }
         case Bar::Position::RIGHT: {
-            zwlr_layer_surface_v1_set_size(get_instance().layer_surface, bar->__width, 0);
-            zwlr_layer_surface_v1_set_anchor(get_instance().layer_surface, ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
+            zwlr_layer_surface_v1_set_size(bar->layer_surface, bar->__width, 0);
+            zwlr_layer_surface_v1_set_anchor(bar->layer_surface, ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
             break;
         }
     }
     
-	zwlr_layer_surface_v1_set_exclusive_zone(get_instance().layer_surface, bar->__height);
-	wl_surface_commit(get_instance().surface);
+	zwlr_layer_surface_v1_set_exclusive_zone(bar->layer_surface, bar->__height);
+	wl_surface_commit(bar->surface);
 }
 
 void Client::start() {
     for (const std::shared_ptr<Bar> &bar : get_instance().__bars) {
-        zwlr_layer_surface_v1_add_listener(get_instance().layer_surface, &layer_surface_listener, bar.get());
-    }
+        bar->show();
 
-    if (!(get_instance().xdg_output = zxdg_output_manager_v1_get_xdg_output(get_instance().output_manager, get_instance().output))) {
-        die("Failed to get xdg output");
+        if (!(bar->xdg_output = zxdg_output_manager_v1_get_xdg_output(get_instance().output_manager, get_instance().output))) {
+            die("Failed to get xdg output");
+        }
     }
 
 	if (int wl_fd = wl_display_get_fd(get_instance().display)) {
@@ -154,36 +159,6 @@ const struct wl_registry_listener Client::registry_listener = {
 	.global_remove = handle_global_remove
 };
 
-// layer surface
-
-void Client::layer_surface_configure(void *data, struct zwlr_layer_surface_v1 *surface, uint32_t serial, uint32_t w, uint32_t h) {
-	Bar &bar = *(Bar *) data;
-    
-    zwlr_layer_surface_v1_ack_configure(surface, serial);
-	
-    if (bar.__configured) return;
-
-	bar.__width = w;
-	bar.__height = h;
-	bar.__stride = bar.__width * 4;
-	bar.__bufsize = bar.__stride * bar.__height;
-	bar.__configured = true;
-
-    infof("Configured bar, size (width: %d, height: %d)", bar.__width, bar.__height);
-
-	bar.draw();
-}
-
-void Client::layer_surface_closed(void *data, struct zwlr_layer_surface_v1 *surface) {
-    (void) data;
-    (void) surface;
-}
-
-const struct zwlr_layer_surface_v1_listener Client::layer_surface_listener = {
-	.configure = layer_surface_configure,
-	.closed = layer_surface_closed,
-};
-
 // init_wayland_connection
 
 void Client::init_wayland_connection() {
@@ -220,14 +195,16 @@ void Client::init_wayland_connection() {
 
         // die("Compositor does not support all required wayland protocols");
     }
+}
 
-    if (!(surface = wl_compositor_create_surface(compositor))) {
-        die("Failed to create a wayland surface");
-    }
-
-    if (!(layer_surface = zwlr_layer_shell_v1_get_layer_surface(layer_shell, surface, output, ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM, "hyprbar"))) {
-        die("Failed to create a wlr layer surface");
-    }
+struct zwlr_layer_surface_v1 *Client::create_layer_surface(Bar *bar) {
+    return zwlr_layer_shell_v1_get_layer_surface(
+        get_instance().layer_shell,
+        bar->surface,
+        get_instance().output,
+        ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM,
+        "hyprbar"
+    );
 }
 
 // FreeType

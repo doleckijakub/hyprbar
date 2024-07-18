@@ -9,6 +9,7 @@ void __logf(const char *level, int r, int g, int b, const char *format, ...);
 
 #define fatalf(format, ...) __logf("FATAL", 127, 0, 0, format, ##__VA_ARGS__)
 #define infof(format, ...)  __logf("INFO", 0, 255, 127, format, ##__VA_ARGS__)
+#define tracef(format, ...)  __logf("TRACE", 127, 127, 127, format, ##__VA_ARGS__)
 
 #define dief(why, ...) do { \
     fatalf(why, ##__VA_ARGS__); \

@@ -38,9 +38,6 @@ private:
     struct wl_shm *shm;
     struct zwlr_layer_shell_v1 *layer_shell;
     struct zxdg_output_manager_v1 *output_manager;
-    struct zxdg_output_v1 *xdg_output;
-    struct wl_surface *surface;
-    struct zwlr_layer_surface_v1 *layer_surface;
     struct wl_output *output;
 
     // Wayland
@@ -54,11 +51,9 @@ private:
     static void handle_global_remove(void *data, struct wl_registry *registry, uint32_t name);
     static const struct wl_registry_listener registry_listener;
 
-    static void layer_surface_configure(void *data, struct zwlr_layer_surface_v1 *surface, uint32_t serial, uint32_t w, uint32_t h);
-    static void layer_surface_closed(void *data, struct zwlr_layer_surface_v1 *surface);
-    static const struct zwlr_layer_surface_v1_listener layer_surface_listener;
-
     void init_wayland_connection();
+
+    static struct zwlr_layer_surface_v1 *create_layer_surface(Bar *bar);
 
     // Font
 

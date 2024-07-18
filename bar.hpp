@@ -46,6 +46,7 @@ public:
     };
 
     Bar(const Config config);
+    ~Bar();
 
 private:
 
@@ -58,6 +59,16 @@ private:
     bool __configured = false;
 
     void draw() const;
+
+	struct wl_surface *surface;
+	struct zxdg_output_v1 *xdg_output;
+    struct zwlr_layer_surface_v1 *layer_surface;
+
+    static void layer_surface_configure(void *data, struct zwlr_layer_surface_v1 *surface, uint32_t serial, uint32_t w, uint32_t h);
+    static void layer_surface_closed(void *data, struct zwlr_layer_surface_v1 *surface);
+    static const struct zwlr_layer_surface_v1_listener layer_surface_listener;
+
+    void show();
 
     friend class Client;
 
